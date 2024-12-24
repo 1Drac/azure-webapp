@@ -1,13 +1,21 @@
 from fastapi import FastAPI, Depends
-import urllib
-import struct
 from typing import Annotated
 from sqlmodel import SQLModel, Field, create_engine, Session
-from azure.identity import DefaultAzureCredential
-from sqlalchemy import event
+from sqlalchemy import URL
+import os
+from dotenv import load_dotenv
 
+load_dotenv()
 
-credential = DefaultAzureCredential()
+driver_name = os.getenv('DRIVER')
+server_name = os.getenv('SERVER_NAME')
+database_name = os.getenv('DATABASE_NAME')
+database_login = os.getenv('DATABASE_LOGIN')
+database_password = os.getenv('DATABASE_PASSWORD')
+
+connection_string = f'Driver={driver_name};Server=tcp:{server_name}.database.windows.net,1433;Database={database_name};Uid={database_login};Pwd={database_password};Encrypt=yes;TrustServerCertificate=no;Connection Timeout=30;'
+connection_url = URL.create("mssql+pyodbc", query={"odbc_connect": connection_string})
+engine = create_engine(connection_url)
 
 class IngredientBase(SQLModel):
 
@@ -23,28 +31,6 @@ class Ingredient(IngredientBase, table=True):
 
 class IngredientPublic(IngredientBase):
     id : int
-
-driver_name = '{ODBC Driver 18 for SQL Server}'
-server_name = 'drac-webapp'
-database_name = 'web-app-database'
-user_name = '13f37c78-05fa-419b-bc36-31088c73635f'
-
-connection_string = 'Driver={};Server=tcp:{}.database.windows.net,1433;Database={};Encrypt=yes;TrustServerCertificate=no;Connection Timeout=30'.format(driver_name, server_name, database_name)
-
-params = urllib.parse.quote(connection_string)
-url = f"mssql+pyodbc:///?odbc_connect={params}"
-engine = create_engine(url)
-
-# from https://docs.sqlalchemy.org/en/20/core/engines.html#generating-dynamic-authentication-tokens
-@event.listens_for(engine, "do_connect")
-def provide_token(dialect, conn_rec, cargs, cparams):
-    
-    token_bytes = credential.get_token("https://database.windows.net/.default").token.encode("UTF-16-LE")
-    token_struct = struct.pack(f'<I{len(token_bytes)}s', len(token_bytes), token_bytes)
-    SQL_COPT_SS_ACCESS_TOKEN = 1256  # This connection option is defined by microsoft in msodbcsql.h
-
-    cparams["attrs_before"] = {SQL_COPT_SS_ACCESS_TOKEN: token_struct}
-
 
 def create_db_and_tables():
     SQLModel.metadata.create_all(engine)
