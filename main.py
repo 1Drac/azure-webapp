@@ -100,5 +100,5 @@ def post_recepie(recepie_ingredient: RecepieIngredientCreate, session: SessionDe
 
 @app.get('/recepie/', response_model=list[RecepiePublic])
 def get_recepie(session: SessionDep, offset: int = 0, limit: Annotated[int, Query(le=100)] = 100):
-    recepies = session.exec(select(Recepie).offset(offset).limit(limit)).all()
+    recepies = session.exec(select(Recepie).offset(offset).limit(limit).order_by(Recepie.id)).all()
     return recepies
